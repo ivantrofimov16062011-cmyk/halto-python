@@ -1,0 +1,55 @@
+# Runs in the public repository github.com/ivantrofimov16062011-cmyk/halto-python (not in Halto's own repository,
+# where this file is only kept): a version tag (e.g. 0.1.0) tests and builds the package, then publishes it to PyPI
+# with attestations. PyPI trusts this workflow through Trusted Publishing (pypi.org → the project → Publishing:
+# repository halto-python, workflow pypi.yml, environment pypi), so no PyPI token is stored anywhere.
+name: Publish
+
+on:
+  push:
+    tags: ["*.*.*"]
+
+permissions: {}
+
+jobs:
+  build:
+    name: Test and build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+      - name: The tag is the package's version
+        run: |
+          test "$(python -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')" = "$GITHUB_REF_NAME"
+          grep -qx "__version__ = \"$GITHUB_REF_NAME\"" src/halto/__init__.py
+      - run: pip install -e ".[dev]"
+      - run: pytest -q
+      - run: pip install build && python -m build
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: dist
+          path: dist/
+          if-no-files-found: error
+
+  # Only this job can ask GitHub for the token PyPI checks, and it installs nothing: what the tests downloaded never
+  # runs next to it.
+  publish:
+    name: Publish to PyPI
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: pypi
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3

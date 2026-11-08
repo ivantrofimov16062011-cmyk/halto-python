@@ -1,0 +1,36 @@
+[build-system]
+requires = ["hatchling>=1.24"]
+build-backend = "hatchling.build"
+
+[project]
+name = "halto"
+version = "0.1.0"
+description = "Python SDK for Halto, the safety gateway for AI agents: check every risky action before it runs."
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.9"
+authors = [{ name = "Halto Labs", email = "team@halto.tech" }]
+keywords = ["ai agents", "guardrails", "prompt injection", "human in the loop", "langchain", "crewai"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Operating System :: OS Independent",
+  "Topic :: Security",
+  "Intended Audience :: Developers",
+]
+dependencies = ["httpx>=0.27,<1"]
+
+[project.optional-dependencies]
+langchain = ["langchain-core>=0.3"]
+crewai = ["crewai>=0.80"]
+dev = ["pytest>=8", "pytest-asyncio>=0.24", "respx>=0.21"]
+
+[project.urls]
+Homepage = "https://www.halto.tech"
+Source = "https://github.com/ivantrofimov16062011-cmyk/halto-python"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/halto"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
