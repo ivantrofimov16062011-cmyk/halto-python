@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "halto"
-version = "0.1.0"
+version = "0.2.0"
 description = "Python SDK for Halto, the safety gateway for AI agents: check every risky action before it runs."
 readme = "README.md"
 license = "MIT"

@@ -12,6 +12,7 @@ from halto import (
     HaltoApprovalRejectedError,
     HaltoAuthError,
     HaltoBlockedError,
+    HaltoError,
     HaltoUnavailableError,
     HaltoValidationError,
 )
@@ -68,13 +69,14 @@ def test_retries_server_errors_then_succeeds():
 
 
 @respx.mock
-def test_unreachable_fails_closed_by_default_and_open_when_asked():
+def test_unreachable_always_fails_closed_and_fail_open_is_refused_at_once():
     respx.post(f"{URL}/v1/check").mock(side_effect=httpx.ConnectError("down"))
     with pytest.raises(HaltoUnavailableError):
         client().check("gmail", "send_email")
-    warnings = []
-    r = client(fail_mode="open", on_warning=warnings.append).check("gmail", "send_email")
-    assert r.decision == "allow" and r.fail_open and warnings
+    with pytest.raises(HaltoUnavailableError):
+        client(fail_mode="closed").check("gmail", "send_email")
+    with pytest.raises(HaltoError, match="gone"):
+        client(fail_mode="open")
 
 
 @respx.mock
@@ -176,7 +178,7 @@ def test_protect_asks_for_placeholders_and_never_falls_back():
     assert (r.content, r.protected, r.protection) == ("Write to [[EMAIL_K7Q2M]]", {"email": 1}, "on")
     assert json.loads(route.calls.last.request.content)["protect"] is True
     respx.post(f"{URL}/v1/clean").mock(return_value=httpx.Response(503, json={}))
-    down = Halto(api_key=KEY, base_url=URL, retries=0, fail_mode="open")
+    down = Halto(api_key=KEY, base_url=URL, retries=0)
     with pytest.raises(HaltoUnavailableError):
         down.protect("maria@gmail.com")
 
@@ -186,9 +188,8 @@ def test_guard_gives_fn_the_params_to_send_halto_s_or_the_callers_when_halto_sen
     respx.post(f"{URL}/v1/check").mock(return_value=httpx.Response(200, json=allow(final_params={"to": "maria@gmail.com"})))
     respx.post(f"{URL}/v1/report").mock(return_value=httpx.Response(200, json={"ok": True}))
     assert client().guard("gmail", "send_email", {"to": "[[EMAIL_P3XR8]]"}, lambda r: r.final_params) == {"to": "maria@gmail.com"}
-    respx.post(f"{URL}/v1/check").mock(side_effect=httpx.ConnectError("down"))
-    open_client = client(fail_mode="open", on_warning=lambda m: None)
-    assert open_client.guard("gmail", "send_email", {"to": "office@hotel.cy"}, lambda r: r.final_params) == {"to": "office@hotel.cy"}
+    respx.post(f"{URL}/v1/check").mock(return_value=httpx.Response(200, json=allow()))
+    assert client().guard("gmail", "send_email", {"to": "office@hotel.cy"}, lambda r: r.final_params) == {"to": "office@hotel.cy"}
 
 
 @respx.mock

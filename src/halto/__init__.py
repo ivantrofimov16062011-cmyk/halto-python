@@ -1,6 +1,6 @@
 """Halto: the safety gateway for AI agents. Check every risky action before your agent takes it."""
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 from .client import AsyncHalto, Halto, Session  # noqa: E402
 from .errors import (  # noqa: E402

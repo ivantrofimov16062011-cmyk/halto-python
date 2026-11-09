@@ -44,13 +44,11 @@ class CheckResult:
     policy_version: int
     approval_id: Optional[str] = None
     approval_expires_at: Optional[str] = None
-    #: True when Halto was unreachable and the client allowed it because fail_mode is "open".
-    fail_open: bool = False
     #: Halto Fix: {"status": "suggested" | "approved", "fields": [...], "issues": [...]} when Halto proposed a corrected text.
     fix: Optional[Dict[str, Any]] = None
     #: The parameters to send to the tool instead of your own: the text the owner approved (Halto Fix) and the real
     #: values behind data-guard placeholders. Halto answers every "allow" with them; inside guard() they are always set
-    #: (your own params when Halto sent none, e.g. with fail_mode="open"). Never hand them back to your model.
+    #: (your own params when Halto sent none). Never hand them back to your model.
     final_params: Optional[Dict[str, Any]] = None
     raw: Dict[str, Any] = field(default_factory=dict, repr=False)
 
@@ -100,17 +98,6 @@ def parse_approval(r: Dict[str, Any]) -> ApprovalStatus:
     )
 
 
-def fail_open_result(category: Optional[str]) -> CheckResult:
-    return CheckResult(
-        decision="allow",
-        reason="Halto was unreachable; allowed because fail_mode is open.",
-        action_id=None,
-        risk=Risk(score=50, level="medium"),
-        category=category or "other",
-        session_tainted=False,
-        policy_version=0,
-        fail_open=True,
-    )
 
 
 def sources_json(sources: Optional[List[Any]]) -> Optional[List[Dict[str, Any]]]:
@@ -127,7 +114,6 @@ class CleanResult:
     changed: bool
     removed: List[Dict[str, Any]] = field(default_factory=list)
     risk_score: int = 0
-    fail_open: bool = False
 
 
 @dataclass

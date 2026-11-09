@@ -6,7 +6,6 @@ import os
 import random
 import time
 import uuid
-import warnings
 from typing import Any, Awaitable, Callable, Dict, List, Optional, Tuple, TypeVar, Union
 from urllib.parse import quote, urlsplit
 
@@ -23,7 +22,7 @@ from .errors import (
     HaltoUnavailableError,
     HaltoValidationError,
 )
-from .types import ApprovalStatus, CheckResult, CleanResult, ContentSource, ProtectResult, fail_open_result, parse_approval, parse_check, parse_clean, parse_protect, sources_json
+from .types import ApprovalStatus, CheckResult, CleanResult, ContentSource, ProtectResult, parse_approval, parse_check, parse_clean, parse_protect, sources_json
 
 T = TypeVar("T")
 Source = Union[ContentSource, Dict[str, Any]]
@@ -124,25 +123,20 @@ class _Base:
         timeout: float = 5.0,
         retries: int = 2,
         fail_mode: str = "closed",
-        on_warning: Optional[Callable[[str], None]] = None,
     ) -> None:
         self.api_key = api_key or os.environ.get("HALTO_API_KEY", "")
         if not self.api_key:
             raise HaltoError("Halto: api_key is required (or set HALTO_API_KEY)", "config")
-        if fail_mode not in ("closed", "open"):
-            raise HaltoError('Halto: fail_mode must be "closed" or "open"', "config")
+        # If Halto can't be reached, the action doesn't run: "open" (allow and warn) is gone since 0.2.0, and "closed"
+        # is still accepted for code written before it.
+        if fail_mode != "closed":
+            raise HaltoError("Halto: fail_mode \"open\" is gone: if Halto can't be reached, the action doesn't run", "config")
         self.base_url = _check_base_url(base_url or os.environ.get("HALTO_URL") or DEFAULT_URL)
         self.timeout = timeout
         self.retries = retries
-        self.fail_mode = fail_mode
-        self.on_warning = on_warning or (lambda m: warnings.warn(m, stacklevel=3))
 
     def _headers(self) -> Dict[str, str]:
         return {"authorization": f"Bearer {self.api_key}", "content-type": "application/json", "x-halto-client": f"sdk-py/{__version__}"}
-
-    def _fail_open(self, tool: str, action: str, category: Optional[str]) -> CheckResult:
-        self.on_warning(f'Halto unreachable — allowing "{tool}.{action}" because fail_mode is "open".')
-        return fail_open_result(category)
 
 
 class Halto(_Base):
@@ -180,21 +174,11 @@ class Halto(_Base):
     ) -> CheckResult:
         """Ask Halto whether an action may run. Never raises for block/pending: inspect ``decision``."""
         body = _check_body(tool, action, params, session_id, cost, currency, category, content_sources)
-        try:
-            return parse_check(self._request("POST", "/v1/check", body))
-        except HaltoUnavailableError:
-            if self.fail_mode == "open":
-                return self._fail_open(tool, action, category)
-            raise
+        return parse_check(self._request("POST", "/v1/check", body))
 
     def clean(self, content: str, *, type: str = "other", origin: Optional[str] = None, session_id: Optional[str] = None) -> CleanResult:
         """Halto Fix: clean what the agent is about to read (email, web page, document) before your model sees it."""
-        try:
-            return parse_clean(self._request("POST", "/v1/clean", _clean_body(content, type, origin, session_id)))
-        except HaltoUnavailableError:
-            if self.fail_mode == "open":
-                return CleanResult(content=content, changed=False, fail_open=True)
-            raise
+        return parse_clean(self._request("POST", "/v1/clean", _clean_body(content, type, origin, session_id)))
 
     def protect(self, content: str, *, type: str = "other", origin: Optional[str] = None, session_id: Optional[str] = None) -> ProtectResult:
         """Data guard: the text for your model with personal and confidential values replaced by placeholders
@@ -334,21 +318,11 @@ class AsyncHalto(_Base):
 
     async def check(self, tool: str, action: str, params: Optional[Dict[str, Any]] = None, *, session_id: Optional[str] = None, cost: Optional[float] = None, currency: Optional[str] = None, category: Optional[str] = None, content_sources: Optional[List[Source]] = None) -> CheckResult:
         body = _check_body(tool, action, params, session_id, cost, currency, category, content_sources)
-        try:
-            return parse_check(await self._request("POST", "/v1/check", body))
-        except HaltoUnavailableError:
-            if self.fail_mode == "open":
-                return self._fail_open(tool, action, category)
-            raise
+        return parse_check(await self._request("POST", "/v1/check", body))
 
     async def clean(self, content: str, *, type: str = "other", origin: Optional[str] = None, session_id: Optional[str] = None) -> CleanResult:
         """Halto Fix: clean what the agent is about to read (email, web page, document) before your model sees it."""
-        try:
-            return parse_clean(await self._request("POST", "/v1/clean", _clean_body(content, type, origin, session_id)))
-        except HaltoUnavailableError:
-            if self.fail_mode == "open":
-                return CleanResult(content=content, changed=False, fail_open=True)
-            raise
+        return parse_clean(await self._request("POST", "/v1/clean", _clean_body(content, type, origin, session_id)))
 
     async def protect(self, content: str, *, type: str = "other", origin: Optional[str] = None, session_id: Optional[str] = None) -> ProtectResult:
         """Data guard: the text for your model with personal and confidential values replaced by placeholders

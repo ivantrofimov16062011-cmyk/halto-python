@@ -88,7 +88,7 @@ def test_trusted_tools_are_still_protected_but_dont_taint_the_session():
 def test_without_protection_halto_cant_check_the_answer_and_it_is_withheld():
     respx.post(f"{URL}/v1/check").mock(return_value=httpx.Response(200, json=answer("allow")))
     respx.post(f"{URL}/v1/clean").mock(return_value=httpx.Response(503, json={}))
-    out = call(halto(fail_mode="open"), {"id": 7}, lambda p: "maria@gmail.com +357 99 123456")
+    out = call(halto(), {"id": 7}, lambda p: "maria@gmail.com +357 99 123456")
     assert "withheld" in out and "maria" not in out
     with pytest.raises(HaltoUnavailableError):
         call(halto(), {"id": 7}, lambda p: "maria@gmail.com", raise_on_block=True)
@@ -120,4 +120,3 @@ def test_an_answer_without_a_decision_is_never_treated_as_allow(body):
     with pytest.raises(HaltoUnavailableError):
         halto().guard("gmail", "send_email", {}, ran.append)
     assert ran == []
-    assert halto(fail_mode="open", on_warning=lambda m: None).check("gmail", "send_email").fail_open is True

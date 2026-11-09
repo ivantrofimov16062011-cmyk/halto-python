@@ -59,7 +59,7 @@ action never runs by accident.
 
 **Always send `r.final_params`, not your own values.** When the owner approves "with Halto's changes" (Halto Fix),
 or your model wrote placeholders such as `[[EMAIL_K7Q2M]]` (data guard), only `final_params` hold what may actually
-go out. Inside `guard` they are always set (your own params when Halto sent none, e.g. with `fail_mode="open"`); after
+go out. Inside `guard` they are always set (your own params when Halto sent none); after
 a plain `check`, use them whenever `decision == "allow"`. Never give them back to your model.
 
 A `200` answer without a valid `decision` (a proxy page, an empty body) raises `HaltoUnavailableError`, like an
@@ -116,8 +116,8 @@ Not covered: errors raised by the tool itself (they reach the framework as they 
 
 ## Failing safely
 
-If Halto can't be reached, `check` raises `HaltoUnavailableError` (fail closed). For low-risk agents,
-`Halto(..., fail_mode="open")` allows the action instead and warns. Network errors, 429 and 5xx are retried
+If Halto can't be reached, `check` raises `HaltoUnavailableError` (fail closed) and the action doesn't run. There is no
+way to let it through instead: `fail_mode="open"` is gone since 0.2.0 and raises at once. Network errors, 429 and 5xx are retried
 (`retries=2` by default).
 
 ## Reporting costs
